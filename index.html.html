@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Ore Smart</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 450px;
+            margin: auto;
+            background: #ffffff;
+            color: #1e293b;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+        }
+        h2 { text-align: center; color: #0f172a; margin-top: 0; }
+        .clock-box {
+            background: #f1f5f9;
+            text-align: center;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #3b82f6;
+            margin-bottom: 15px;
+            border: 2px dashed #cbd5e1;
+        }
+        .settings-box {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .settings-box input {
+            width: 90px;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            font-size: 14px;
+            text-align: right;
+            font-weight: bold;
+        }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            color: white;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        button:active { transform: scale(0.96); }
+        .btn-entra { background: #10b981; }
+        .btn-entra:hover { background: #059669; }
+        .btn-esci { background: #ef4444; }
+        .btn-esci:hover { background: #dc2626; }
+        
+        .status {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        .total-box {
+            background: #ecfdf5;
+            border: 1px solid #10b981;
+            color: #065f46;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        h3 { border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; color: #475569; }
+        .log-item {
+            background: #f8fafc;
+            border-left: 4px solid #3b82f6;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .clear-btn {
+            width: 100%;
+            background: #64748b;
+            margin-top: 20px;
+            font-size: 14px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>⏱️ Registro Ore & Stipendio</h2>
+    
+    <div class="clock-box" id="orologio-live">00:00:00</div>
+    
+    <div class="settings-box">
+        <label for="paga-oraria">💶 Paga Oraria (€):</label>
+        <input type="number" id="paga-oraria" value="8.5" step="0.5" onchange="salvaTariffa()">
+    </div>
+
+    <div id="stato-corrente" class="status">Stato: In attesa di timbratura</div>
+
+    <div class="btn-grid">
+        <button class="btn-entra" onclick="registraEntrata()">🟢 Entra</button>
+        <button class="btn-esci" onclick="registraUscita()">🔴 Esci</button>
+    </div>
+
+    <div class="total-box" id="totale-guadagno">Guadagno totale: € 0.00</div>
+
+    <h3>📅 Storico Giornaliero</h3>
+    <div id="storico"></div>
+
+    <button class="clear-btn" onclick="cancellaStorico()">🗑️ Pulisci Storico</button>
+</div>
+
+<script>
+    // Orologio in tempo reale
+    setInterval(() => {
+        const ora = new Date();
+        document.getElementById('orologio-live').innerText = ora.toLocaleTimeString('it-IT');
+    }, 1000);
+
+    // Carica tariffa salvata all'avvio
+    window.onload = function() {
+        let tariffaSalvata = localStorage.getItem('tariffa_oraria');
+        if (tariffaSalvata) {
+            document.getElementById('paga-oraria').value = tariffaSalvata;
+        }
+        aggiornaInterfaccia();
+    };
+
+    function salvaTariffa() {
+        let tariffa = document.getElementById('paga-oraria').value;
+        localStorage.setItem('tariffa_oraria', tariffa);
+        aggiornaInterfaccia();
+    }
+
+    function registraEntrata() {
+        const adesso = new Date();
+        const dataOggi = adesso.toISOString().split('T')[0];
+        const oraEntrata = adesso.toTimeString().split(' ')[0].substring(0, 5);
+
+        let turni = JSON.parse(localStorage.getItem('miei_turni')) || [];
+        let turnoOggi = turni.find(t => t.data === dataOggi && !t.uscita);
+
+        if (turnoOggi) {
+            alert('Hai già timbrato l\'entrata oggi!');
+            return;
+        }
+
+        turni.push({
+            data: dataOggi,
+            entrata: oraEntrata,
+            uscita: null,
+            oreLavorate: null
+        });
+
+        localStorage.setItem('miei_turni', JSON.stringify(turni));
+        aggiornaInterfaccia();
+    }
+
+    function registraUscita() {
+        const adesso = new Date();
+        const dataOggi = adesso.toISOString().split('T')[0];
+        const oraUscita = adesso.toTimeString().split(' ')[0].substring(0, 5);
+
+        let turni = JSON.parse(localStorage.getItem('miei_turni')) || [];
+        let turnoOggi = turni.find(t => t.data === dataOggi && !t.uscita);
+
+        if (!turnoOggi) {
+            alert('Prima devi timbrare l\'entrata!');
+            return;
+        }
+
+        turnoOggi.uscita = oraUscita;
+
+        const [hEntrata, mEntrata] = turnoOggi.entrata.split(':').map(Number);
+        const [hUscita, mUscita] = oraUscita.split(':').map(Number);
+        
+        let minTotaliEntrata = hEntrata * 60 + mEntrata;
+        let minTotaliUscita = hUscita * 60 + mUscita;
+        let diffMinuti = minTotaliUscita - minTotaliEntrata;
+
+        let oreLavorate = (diffMinuti / 60).toFixed(2);
+        turnoOggi.oreLavorate = oreLavorate;
+
+        localStorage.setItem('miei_turni', JSON.stringify(turni));
+        aggiornaInterfaccia();
+    }
+
+    function aggiornaInterfaccia() {
+        let turni = JSON.parse(localStorage.getItem('miei_turni')) || [];
+        const storicoDiv = document.getElementById('storico');
+        const statoDiv = document.getElementById('stato-corrente');
+        const totaleBox = document.getElementById('totale-guadagno');
+        const tariffa = parseFloat(document.getElementById('paga-oraria').value) || 0;
+        
+        const dataOggi = new Date().toISOString().split('T')[0];
+        let turnoOggi = turni.find(t => t.data === dataOggi && !t.uscita);
+
+        if (turnoOggi) {
+            statoDiv.innerText = `Stato: Al lavoro (Entrata alle ${turnoOggi.entrata})`;
+            statoDiv.style.background = '#d1fae5';
+            statoDiv.style.color = '#065f46';
+        } else {
+            statoDiv.innerText = `Stato: Fuori turno`;
+            statoDiv.style.background = '#fef3c7';
+            statoDiv.style.color = '#d97706';
+        }
+
+        storicoDiv.innerHTML = '';
+        let guadagnoTotale = 0;
+
+        if (turni.length === 0) {
+            storicoDiv.innerHTML = '<p style="color: #94a3b8; font-size: 14px; text-align: center;">Nessun giorno registrato.</p>';
+            totaleBox.innerText = 'Guadagno totale: € 0.00';
+            return;
+        }
+
+        turni.slice().reverse().forEach(t => {
+            let infoUscita = t.uscita ? ` - Uscita: ${t.uscita}` : ` <span style="color:#e11d48;">(In corso)</span>`;
+            let infoOre = '';
+            
+            if (t.oreLavorate) {
+                let guadagnoGiorno = t.oreLavorate * tariffa;
+                guadagnoTotale += guadagnoGiorno;
+                infoOre = `<br>⏱️ Ore: <strong>${t.oreLavorate}h</strong> | 💰 Guadagno: <strong>€ ${guadagnoGiorno.toFixed(2)}</strong>`;
+            }
+            
+            storicoDiv.innerHTML += `
+                <div class="log-item">
+                    <strong>📅 ${t.data}</strong><br>
+                    🟢 Entrata: ${t.entrata} ${infoUscita}
+                    ${infoOre}
+                </div>
+            `;
+        });
+
+        totaleBox.innerText = `Guadagno totale: € ${guadagnoTotale.toFixed(2)}`;
+    }
+
+    function cancellaStorico() {
+        if(confirm('Vuoi davvero cancellare tutto lo storico?')) {
+            localStorage.removeItem('miei_turni');
+            aggiornaInterfaccia();
+        }
+    }
+</script>
+
+</body>
+</html>
